@@ -143,10 +143,10 @@ def main():
             {
                 # We know the length of both fields. If not the
                 # tf.VarLenFeature could be used
-                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True),
-                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True),
+                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
+                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
                 'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value = 0),
-                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True)
+                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value = 0)
             }
         )
     train_dataset = tf.data.TFRecordDataset("coverage_data").shuffle(batch_size).repeat(None)
