@@ -146,7 +146,7 @@ def main():
                 'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
                 'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
                 'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value = 0),
-                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value = 0)
+                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.float32, allow_missing=True, default_value = 0)
             }
         )
     train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).batch(batch_size, drop_remainder=False).repeat(None)
@@ -159,8 +159,8 @@ def main():
 
         init_output = np.zeros((model.batch_size, model.size))
         # Iterate over the batches of the dataset.
-        for step, (input_data, target, mask, key_words) in enumerate(train_dataset.map(decode_fn)):
-
+        for step, batch_dict in enumerate(train_dataset):
+            input_data, target, mask, key_words = batch_dict.values()
             # Open a GradientTape to record the operations run
             # during the forward pass, which enables auto-differentiation.
             with tf.GradientTape() as tape:
