@@ -36,7 +36,7 @@ class Model(object):
         
         self.cells = tf.keras.layers.StackedRNNCells([lstm_cell() for _ in range(config.num_layers)])
 
-        self.embedding = word_vec # pickle.load(open('word_vec.pkl', 'rb'))
+        self.embedding = tf.cast(word_vec, tf.float32) # pickle.load(open('word_vec.pkl', 'rb'))
         # inputs = tf.nn.embedding_lookup(self.embedding, self._input_data)
         # keyword_inputs = tf.nn.embedding_lookup(self.embedding, self._input_word)
 
@@ -70,36 +70,40 @@ class Model(object):
 
         # probably MTA part
         res1 = tf.sigmoid(tf.matmul(tf.reshape(keyword_embeddings, [self.batch_size, -1]), self.u_f))
-        phi_res = tf.reduce_sum(input_tensor=mask, axis=1, keepdims=True) * res1
+        phi_res = tf.reduce_sum(input_tensor=mask, axis=1, keepdims=True) * tf.cast(res1, tf.float32)
             
         self.output1 = phi_res
             
         outputs = []
         output_state = init_output.copy()
+        state = self.cells.get_initial_state(batch_size = self.batch_size, dtype=tf.float32)
+        # print(state.shape)
         # state = self._initial_state
         entropy_cost = []
 
         for time_step in range(self.num_steps):
             vs = []
             for s2 in range(config.num_keywords):
-                vi = tf.matmul(tf.tanh(tf.add(tf.add(
-                    tf.matmul(output_state, self.w1),
-                    tf.matmul(keyword_embeddings[:, s2, :], self.w2)), self.b)), self.u)
+                a = tf.matmul(output_state, self.w1)
+                b = tf.matmul(keyword_embeddings[:, s2, :], self.w2)
+                c = tf.add(a, b)
+
+                vi = tf.matmul(tf.tanh(tf.add(c, self.b1)), self.u)
                 vs.append(vi * self.gate[:, s2:s2+1])
                 
-                attention_vs = tf.concat(vs, axis=1)
-                prob_p = tf.nn.softmax(attention_vs)
-                
-                self.gate = self.gate - (prob_p / phi_res)
-                
-                atten_sum += prob_p * mask[:, time_step:time_step+1]
-                
-                mt = tf.add_n([prob_p[:, i:i+1]*keyword_inputs[:, i, :] for i in range(config.num_keywords)])
+            attention_vs = tf.concat(vs, axis=1)
+            prob_p = tf.nn.softmax(attention_vs)
+            
+            self.gate = self.gate - (prob_p / phi_res)
+            
+            atten_sum = prob_p * mask[:, time_step:time_step+1]
+            mt = tf.add_n([prob_p[:, i:i+1]*keyword_embeddings[:, i, :] for i in range(config.num_keywords)])
 
-                # if time_step > 0: tf.compat.v1.get_variable_scope().reuse_variables()
-                (cell_output, state) = self.cells(tf.concat([input_embeddings[:, time_step, :], mt], axis=1), state) 
-                outputs.append(cell_output)
-                output_state = cell_output
+            # if time_step > 0: tf.compat.v1.get_variable_scope().reuse_variables()
+            (cell_output, state) = self.cells(tf.concat([input_embeddings[:, time_step, :], mt], axis=1), state) 
+
+            outputs.append(cell_output)
+            output_state = cell_output
             
             end_output = cell_output
             
@@ -153,7 +157,7 @@ def main():
                 'key_words': tf.io.FixedLenFeature([batch_size*config.num_keywords], tf.int64)
             }
         )
-    train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).batch(batch_size, drop_remainder=False).repeat(None)
+    train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).repeat(None)
     model = Model(is_training=True, config=config)
     optimizer = tf.keras.optimizers.Adam(learning_rate=config.learning_rate)
 
@@ -161,7 +165,7 @@ def main():
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
 
-        init_output = np.zeros((model.batch_size, model.size))
+        init_output = np.zeros((model.batch_size, model.size), dtype=np.float32)
         # Iterate over the batches of the dataset.
         for step, batch_dict in enumerate(train_dataset):
             input_data = batch_dict['input_data']
@@ -172,7 +176,7 @@ def main():
             input_data = tf.cast(input_data, tf.int32)
             target = tf.cast(target, tf.int32)
             mask = tf.cast(mask, tf.float32)
-            key_words = tf.cast(key_words, tf.float32)
+            key_words = tf.cast(key_words, tf.int32)
 
             input_data = tf.reshape(input_data, [batch_size, -1])
             target = tf.reshape(target, [batch_size, -1])
