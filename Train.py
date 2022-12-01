@@ -43,14 +43,14 @@ class Model(object):
             features={
                 # We know the length of both fields. If not the
                 # tf.VarLenFeature could be used
-                'input_data': tf.io.FixedLenFeature([batch_size*num_steps],tf.int64, default_value=[0] * (batch_size*num_steps)),
-                'target': tf.io.FixedLenFeature([batch_size*num_steps],tf.int64, default_value=[0] * (batch_size*num_steps)),
-                'mask': tf.io.FixedLenFeature([batch_size*num_steps],tf.float32, default_value=[0.0] * (batch_size*num_steps)),
-                'key_words': tf.io.FixedLenFeature([batch_size*config.num_keywords],tf.int64, default_value=[0] * (batch_size*config.num_keywords))
+                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value=0),
+                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value=0),
+                'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value=0.0),
+                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value=0)
             })
         
         self._input_data = tf.cast(features['input_data'], tf.int32)
-        self._targets = tf.cast(features['target'], tf.int32) 
+        self._targets = tf.cast(features['target'], tf.int32)
         self._input_word = tf.cast(features['key_words'], tf.int32)
         self._init_output = tf.compat.v1.placeholder(tf.float32, [batch_size, size])
         self._mask = tf.cast(features['mask'], tf.float32)
@@ -73,7 +73,7 @@ class Model(object):
         self._initial_state = cell.zero_state(batch_size, tf.float32)
 
         with tf.device("/cpu:0"):
-            embedding = tf.compat.v1.get_variable('word_embedding', [vocab_size, config.word_embedding_size], trainable=True, initializer=tf.compat.v1.constant_initializer(word_vec))
+            embedding = tf.compat.v1.get_variable('word_embedding', [vocab_size, config.word_embedding_size], trainable=True, initializer=tf.compat.v1.constant_initializer(word_vec), use_resource=False)
             inputs = tf.nn.embedding_lookup(params=embedding, ids=self._input_data)#返回一个tensor，shape是(batch_size, num_steps, size)
             keyword_inputs = tf.nn.embedding_lookup(params=embedding, ids=self._input_word)
 
@@ -85,7 +85,7 @@ class Model(object):
         atten_sum = tf.zeros([batch_size, config.num_keywords])
         
         with tf.compat.v1.variable_scope("coverage"):
-            u_f = tf.compat.v1.get_variable("u_f", [config.num_keywords*config.word_embedding_size, config.num_keywords])
+            u_f = tf.compat.v1.get_variable("u_f", [config.num_keywords*config.word_embedding_size, config.num_keywords], use_resource=False)
             res1 = tf.sigmoid(tf.matmul(tf.reshape(keyword_inputs, [batch_size, -1]), u_f))
             phi_res = tf.reduce_sum(input_tensor=self._mask, axis=1, keepdims=True) * res1
             
@@ -101,10 +101,10 @@ class Model(object):
                 for s2 in range(config.num_keywords):
                     with tf.compat.v1.variable_scope("RNN_attention"):
                         if time_step > 0 or s2 > 0: tf.compat.v1.get_variable_scope().reuse_variables()
-                        u  = tf.compat.v1.get_variable("u", [size, 1])
-                        w1 = tf.compat.v1.get_variable("w1", [size, size])
-                        w2 = tf.compat.v1.get_variable("w2", [config.word_embedding_size, size])
-                        b  = tf.compat.v1.get_variable("b1", [size])
+                        u  = tf.compat.v1.get_variable("u", [size, 1], use_resource=False)
+                        w1 = tf.compat.v1.get_variable("w1", [size, size], use_resource=False)
+                        w2 = tf.compat.v1.get_variable("w2", [config.word_embedding_size, size], use_resource=False)
+                        b  = tf.compat.v1.get_variable("b1", [size], use_resource=False)
 
                         vi = tf.matmul(tf.tanh(tf.add(tf.add(
                             tf.matmul(output_state, w1),
@@ -132,8 +132,8 @@ class Model(object):
         output = tf.reshape(tf.concat(outputs, axis=1), [-1, size])
         print("OUTPUT", output.shape)
         
-        softmax_w = tf.compat.v1.get_variable("softmax_w", [size, vocab_size])
-        softmax_b = tf.compat.v1.get_variable("softmax_b", [vocab_size])
+        softmax_w = tf.compat.v1.get_variable("softmax_w", [size, vocab_size], use_resource=False)
+        softmax_b = tf.compat.v1.get_variable("softmax_b", [vocab_size], use_resource=False)
         print("SOFTMAX W", softmax_w.shape)
         print("SOFTMAX B", softmax_b.shape)
         logits = tf.matmul(output, softmax_w) + softmax_b
