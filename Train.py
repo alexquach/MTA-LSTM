@@ -51,16 +51,17 @@ class Model(object):
 
         self.gate = tf.ones([self.batch_size, config.num_keywords])
         self.atten_sum = tf.zeros([self.batch_size, config.num_keywords])
-        self.u_f = tf.Variable(tf.random_uniform_initializer(shape=[config.num_keywords * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
-        # self.u_f = tf.compat.v1.get_variable("u_f", [config.num_keywords*config.word_embedding_size, config.num_keywords], use_resource=False)
 
-        self.u = tf.Variable(tf.random_uniform_initializer(shape=[self.size, 1], dtype=tf.float32))
-        self.w1 = tf.Variable(tf.random_uniform_initializer(shape=[self.size, self.size], dtype=tf.float32))
-        self.w2 = tf.Variable(tf.random_uniform_initializer(shape=[config.word_embedding_size, self.size], dtype=tf.float32))
-        self.b1 = tf.Variable(tf.random_uniform_initializer(shape=[self.size], dtype=tf.float32))
+        random_uniform_initializer = tf.random_uniform_initializer(minval=-config.init_scale, maxval=config.init_scale)
+        self.u_f = tf.Variable(random_uniform_initializer(shape=[config.num_keywords * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
+        
+        self.u = tf.Variable(random_uniform_initializer(shape=[self.size, 1], dtype=tf.float32))
+        self.w1 = tf.Variable(random_uniform_initializer(shape=[self.size, self.size], dtype=tf.float32))
+        self.w2 = tf.Variable(random_uniform_initializer(shape=[config.word_embedding_size, self.size], dtype=tf.float32))
+        self.b1 = tf.Variable(random_uniform_initializer(shape=[self.size], dtype=tf.float32))
 
-        self.softmax_w = tf.Variable(tf.random_uniform_initializer(shape=[self.size, self.vocab_size], dtype=tf.float32))
-        self.softmax_b = tf.Variable(tf.random_uniform_initializer(shape=[self.vocab_size], dtype=tf.float32))
+        self.softmax_w = tf.Variable(random_uniform_initializer(shape=[self.size, self.vocab_size], dtype=tf.float32))
+        self.softmax_b = tf.Variable(random_uniform_initializer(shape=[self.vocab_size], dtype=tf.float32))
 
     def forward(self, input_data, init_output, mask, keyword_inputs, is_training=False):
         # probably MTA part
