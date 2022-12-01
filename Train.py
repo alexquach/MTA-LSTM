@@ -13,7 +13,7 @@ import tensorflow_addons as tfa
 config_tf = tf.compat.v1.ConfigProto()
 config_tf.gpu_options.allow_growth = True
 
-total_step = 61 #get value from output of Preprocess.py file
+total_step = 248 #get value from output of Preprocess.py file
 
 config = Config.Config()
 
