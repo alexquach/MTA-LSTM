@@ -1,7 +1,7 @@
 #coding:utf-8
 import numpy as np
 import tensorflow as tf
-import cPickle, os, collections
+import pickle, os, collections
 import Config
 
 config = Config.Config()
@@ -24,18 +24,19 @@ def Read_WordVec(config):
         for line in fvec:
             line = line.split()
             try:
-                word = line[0].decode('utf-8')
+                word = line[0]#.decode('utf-8')
                 vec = [float(i) for i in line[1:]]
                 assert len(vec) == config.word_embedding_size
                 wordLS.append(word)
                 vec_ls.append(vec)
             except:
-                print line[0]
-        assert len(wordLS) == config.vocab_size
+                print("exception occurred")
+                #print(line[0])
+        #assert len(wordLS) == config.vocab_size
         word_vec = np.array(vec_ls, dtype=np.float32)
         
-        cPickle.dump(word_vec, open('word_vec.pkl','w'), protocol=cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump(wordLS, open('word_voc.pkl','w'), protocol=cPickle.HIGHEST_PROTOCOL)
+        pickle.dump(word_vec, open('word_vec.pkl','wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(wordLS, open('word_voc.pkl','wb'), protocol=pickle.HIGHEST_PROTOCOL)
         
     return wordLS, word_vec
 
@@ -43,7 +44,7 @@ def Read_Data(config):
     trainingdata = []
     with open(os.path.join(config.data_dir, 'TrainingData.txt'),'r') as ftext:
         for line in ftext:
-            line = line.decode('utf-8')
+            #line = line.decode('utf-8')
             tmp = line.split()
             idx = tmp.index('</d>')
             doc = tmp[:idx]
@@ -53,7 +54,7 @@ def Read_Data(config):
             trainingdata.append((doc, keywords))
     return trainingdata
     
-print 'loading the trainingdata...'
+print('loading the trainingdata...')
 DATADIR = config.data_dir
 vocab, _ = Read_WordVec(config)
 
@@ -63,7 +64,7 @@ word_to_idx = { ch:i for i,ch in enumerate(vocab) }
 idx_to_word = { i:ch for i,ch in enumerate(vocab) }
 data_size, _vocab_size = len(data), len(vocab)
 
-print 'data has %d document, size of word vocabular: %d.' % (data_size, _vocab_size)
+print('data has %d document, size of word vocabular: %d.' % (data_size, _vocab_size))
     
 def data_iterator(trainingdata, batch_size, num_steps):
     epoch_size = len(trainingdata) // batch_size
@@ -75,7 +76,10 @@ def data_iterator(trainingdata, batch_size, num_steps):
             raw_data.append(it[0])
             tmp = []
             for wd in it[1]:
-                tmp.append(word_to_idx[wd])
+                if wd in vocab:
+                    tmp.append(word_to_idx[wd])
+                else:
+                    tmp.append(3)
             key_words.append(tmp)
             
         data = np.zeros((len(raw_data), num_steps+1), dtype=np.int64)
@@ -87,7 +91,7 @@ def data_iterator(trainingdata, batch_size, num_steps):
                     tmp.append(word_to_idx[wd])
                 else:
                     tmp.append(3)
-            tmp.append(2)        
+            tmp.append(2)     
             tmp = np.array(tmp, dtype=np.int64)
             _size = tmp.shape[0]
             data[i][:_size] = tmp
@@ -101,7 +105,7 @@ def data_iterator(trainingdata, batch_size, num_steps):
             
             
 train_data = data
-writer = tf.python_io.TFRecordWriter("coverage_data")
+writer = tf.io.TFRecordWriter("coverage_data")
 dataLS = []
 for step, (x, y, mask, key_words) in enumerate(data_iterator(train_data, config.batch_size, config.num_steps)):
     example = tf.train.Example(
@@ -125,4 +129,4 @@ for step, (x, y, mask, key_words) in enumerate(data_iterator(train_data, config.
     # write the serialized object to disk
     writer.write(serialized)
     
-print 'total step: ',step
+print('total step: ',step)

@@ -7,7 +7,7 @@ class Config(object):
     learning_rate = 0.001
     max_grad_norm = 10 #gradient clipping
     num_layers = 2
-    num_steps = 101 #this value is one more than max number of words in sentence
+    num_steps = 1000 #this value is one more than max number of words in sentence
     hidden_size = 20
     word_embedding_size = 10
     max_epoch = 30
