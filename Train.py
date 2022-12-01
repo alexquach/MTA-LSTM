@@ -64,8 +64,12 @@ class Model(object):
         self.softmax_b = tf.Variable(random_uniform_initializer(shape=[self.vocab_size], dtype=tf.float32))
 
     def forward(self, input_data, init_output, mask, keyword_inputs, is_training=False):
+
+        input_embeddings = tf.nn.embedding_lookup(params=self.embedding, ids=input_data)#返回一个tensor，shape是(batch_size, num_steps, size)
+        keyword_embeddings = tf.nn.embedding_lookup(params=self.embedding, ids=keyword_inputs)
+
         # probably MTA part
-        res1 = tf.sigmoid(tf.matmul(tf.reshape(keyword_inputs, [self.batch_size, -1]), self.u_f))
+        res1 = tf.sigmoid(tf.matmul(tf.reshape(keyword_embeddings, [self.batch_size, -1]), self.u_f))
         phi_res = tf.reduce_sum(input_tensor=mask, axis=1, keepdims=True) * res1
             
         self.output1 = phi_res
@@ -80,7 +84,7 @@ class Model(object):
             for s2 in range(config.num_keywords):
                 vi = tf.matmul(tf.tanh(tf.add(tf.add(
                     tf.matmul(output_state, self.w1),
-                    tf.matmul(keyword_inputs[:, s2, :], self.w2)), self.b)), self.u)
+                    tf.matmul(keyword_embeddings[:, s2, :], self.w2)), self.b)), self.u)
                 vs.append(vi * self.gate[:, s2:s2+1])
                 
                 attention_vs = tf.concat(vs, axis=1)
@@ -93,7 +97,7 @@ class Model(object):
                 mt = tf.add_n([prob_p[:, i:i+1]*keyword_inputs[:, i, :] for i in range(config.num_keywords)])
 
                 # if time_step > 0: tf.compat.v1.get_variable_scope().reuse_variables()
-                (cell_output, state) = self.cells(tf.concat([input_data[:, time_step, :], mt], axis=1), state) 
+                (cell_output, state) = self.cells(tf.concat([input_embeddings[:, time_step, :], mt], axis=1), state) 
                 outputs.append(cell_output)
                 output_state = cell_output
             
@@ -143,10 +147,10 @@ def main():
             {
                 # We know the length of both fields. If not the
                 # tf.VarLenFeature could be used
-                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
-                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value = 0),
-                'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value = 0),
-                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value = 0)
+                'input_data': tf.io.FixedLenFeature([batch_size*num_steps], tf.int64),
+                'target': tf.io.FixedLenFeature([batch_size*num_steps], tf.int64),
+                'mask': tf.io.FixedLenFeature([batch_size*num_steps], tf.float32),
+                'key_words': tf.io.FixedLenFeature([batch_size*config.num_keywords], tf.int64)
             }
         )
     train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).batch(batch_size, drop_remainder=False).repeat(None)
@@ -160,12 +164,20 @@ def main():
         init_output = np.zeros((model.batch_size, model.size))
         # Iterate over the batches of the dataset.
         for step, batch_dict in enumerate(train_dataset):
-            input_data, target, mask, key_words = batch_dict.values()
+            input_data = batch_dict['input_data']
+            target = batch_dict['target']
+            mask = batch_dict['mask']
+            key_words = batch_dict['key_words']
             
             input_data = tf.cast(input_data, tf.int32)
             target = tf.cast(target, tf.int32)
             mask = tf.cast(mask, tf.float32)
-            key_words = tf.cast(key_words, tf.int32)
+            key_words = tf.cast(key_words, tf.float32)
+
+            input_data = tf.reshape(input_data, [batch_size, -1])
+            target = tf.reshape(target, [batch_size, -1])
+            mask = tf.reshape(mask, [batch_size, -1])
+            key_words = tf.reshape(key_words, [batch_size, -1])
             
             # Open a GradientTape to record the operations run
             # during the forward pass, which enables auto-differentiation.
