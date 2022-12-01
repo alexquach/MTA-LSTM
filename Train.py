@@ -51,7 +51,7 @@ class Model(object):
 
         self.gate = tf.ones([self.batch_size, config.num_keywords])
         self.atten_sum = tf.zeros([self.batch_size, config.num_keywords])
-        self.u_f = tf.Variable(tf.random_uniform_initializer(shape=[config.num_words * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
+        self.u_f = tf.Variable(tf.random_uniform_initializer(shape=[config.num_keywords * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
         # self.u_f = tf.compat.v1.get_variable("u_f", [config.num_keywords*config.word_embedding_size, config.num_keywords], use_resource=False)
 
         self.u = tf.Variable(tf.random_uniform_initializer(shape=[self.size, 1], dtype=tf.float32))
