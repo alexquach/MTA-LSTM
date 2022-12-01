@@ -29,8 +29,9 @@ class Model(object):
         self.size = size = config.hidden_size
         vocab_size = config.vocab_size
         
-        filename_queue = tf.compat.v1.train.string_input_producer([filename],
-                                                    num_epochs=None)
+        # filename_queue = tf.compat.v1.train.string_input_producer([filename],
+        #                                             num_epochs=None)
+        filename_queue = tf.data.Dataset.from_tensor_slices([filename]).shuffle(self.batch_size).repeat(None)
         # Unlike the TFRecordWriter, the TFRecordReader is symbolic
         reader = tf.compat.v1.TFRecordReader()
         # One can read a single serialized example from a filename
