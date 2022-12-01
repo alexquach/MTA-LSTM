@@ -15,8 +15,8 @@ class Config(object):
     keep_prob = 0.5 #The probability that each element is kept through dropout layer
     lr_decay = 1.0
     batch_size = 4
-    vocab_size = 7187
-    num_keywords = 4
+    vocab_size = 400004
+    num_keywords = 5
     save_freq = 10 #The step (counted by the number of iterations) at which the model is saved to hard disk.
     model_path = './Model_News' #the path of model that need to save or load
     

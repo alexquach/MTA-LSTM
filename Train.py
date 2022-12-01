@@ -149,8 +149,7 @@ def main():
                 'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value = 0)
             }
         )
-    train_dataset = tf.data.TFRecordDataset("coverage_data").shuffle(batch_size).repeat(None)
-
+    train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).batch(batch_size, drop_remainder=False).repeat(None)
     model = Model(is_training=True, config=config)
     optimizer = tf.keras.optimizers.Adam(learning_rate=config.learning_rate)
 
