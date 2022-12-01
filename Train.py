@@ -35,7 +35,6 @@ class Model(object):
             return LSTM_cell
         
         self.cells = tf.keras.layers.StackedRNNCells([lstm_cell() for _ in range(config.num_layers)])
-        self._initial_state = self.cells.zero_state(self.batch_size, tf.float32)
 
         self.embedding = word_vec # pickle.load(open('word_vec.pkl', 'rb'))
         # inputs = tf.nn.embedding_lookup(self.embedding, self._input_data)
