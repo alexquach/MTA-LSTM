@@ -54,7 +54,7 @@ class Model(object):
 
         random_uniform_initializer = tf.random_uniform_initializer(minval=-config.init_scale, maxval=config.init_scale)
         self.u_f = tf.Variable(random_uniform_initializer(shape=[config.num_keywords * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
-        
+
         self.u = tf.Variable(random_uniform_initializer(shape=[self.size, 1], dtype=tf.float32))
         self.w1 = tf.Variable(random_uniform_initializer(shape=[self.size, self.size], dtype=tf.float32))
         self.w2 = tf.Variable(random_uniform_initializer(shape=[config.word_embedding_size, self.size], dtype=tf.float32))
@@ -143,13 +143,13 @@ def main():
             {
                 # We know the length of both fields. If not the
                 # tf.VarLenFeature could be used
-                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value=0),
-                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True, default_value=0),
-                'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value=0.0),
-                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True, default_value=0)
+                'input_data': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True),
+                'target': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.int64, allow_missing=True),
+                'mask': tf.io.FixedLenSequenceFeature([batch_size*num_steps], tf.float32, allow_missing=True, default_value = 0),
+                'key_words': tf.io.FixedLenSequenceFeature([batch_size*config.num_keywords], tf.int64, allow_missing=True)
             }
         )
-    train_dataset = tf.data.TFRecordDataset(["coverage_data"]).shuffle(batch_size).repeat(None)
+    train_dataset = tf.data.TFRecordDataset("coverage_data").shuffle(batch_size).repeat(None)
 
     model = Model(is_training=True, config=config)
     optimizer = tf.keras.optimizers.Adam(learning_rate=config.learning_rate)

@@ -14,7 +14,7 @@ class Config(object):
     max_max_epoch = 80
     keep_prob = 0.5 #The probability that each element is kept through dropout layer
     lr_decay = 1.0
-    batch_size = 16
+    batch_size = 4
     vocab_size = 7187
     num_keywords = 5
     save_freq = 10 #The step (counted by the number of iterations) at which the model is saved to hard disk.
