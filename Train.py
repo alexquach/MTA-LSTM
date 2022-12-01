@@ -131,9 +131,8 @@ class Model(object):
         
     
 def main():
-    config = config_tf
-    batch_size = config_tf.batch_size
-    num_steps = config_tf.num_steps
+    batch_size = config.batch_size
+    num_steps = config.num_steps
     
     def decode_fn(record_bytes):
         return tf.io.parse_single_example(
