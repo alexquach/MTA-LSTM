@@ -2,9 +2,12 @@
 import tensorflow as tf
 import sys,time
 import numpy as np
-import pickle, os
+import pickle5 as pickle
+import os
 import random
 import Config
+
+from tqdm import tqdm
 
 # import tensorflow_addons as tfa
 
@@ -112,7 +115,7 @@ def sequence_loss(
                 )
                 crossent = tf.math.divide_no_nan(crossent, total_count)
         return crossent
-class Model(object):
+class LSTMModel(object):
     def __init__(self, is_training, config):
         self.batch_size = config.batch_size
         self.num_steps = config.num_steps
@@ -139,8 +142,8 @@ class Model(object):
         # if is_training and config.keep_prob < 1:
         #     inputs = tf.nn.dropout(inputs, rate=1 - (config.keep_prob))
 
-        self.gate = tf.ones([self.batch_size, config.num_keywords])
-        self.atten_sum = tf.zeros([self.batch_size, config.num_keywords])
+        self.gate = tf.Variable(tf.ones([self.batch_size, config.num_keywords]))
+        self.atten_sum = tf.Variable(tf.zeros([self.batch_size, config.num_keywords]))
 
         random_uniform_initializer = tf.random_uniform_initializer(minval=-config.init_scale, maxval=config.init_scale)
         self.u_f = tf.Variable(random_uniform_initializer(shape=[config.num_keywords * config.word_embedding_size, config.num_keywords], dtype=tf.float32))
@@ -152,6 +155,20 @@ class Model(object):
 
         self.softmax_w = tf.Variable(random_uniform_initializer(shape=[self.size, self.vocab_size], dtype=tf.float32))
         self.softmax_b = tf.Variable(random_uniform_initializer(shape=[self.vocab_size], dtype=tf.float32))
+        
+    def trainable_weights(self):
+        return [
+            *self.cells.trainable_weights,
+            self.gate,
+            self.atten_sum,
+            self.u_f,
+            self.u,
+            self.w1,
+            self.w2,
+            self.b1,
+            self.softmax_w,
+            self.softmax_b
+        ]
 
     def forward(self, input_data, init_output, mask, keyword_inputs, is_training=False):
 
@@ -159,8 +176,8 @@ class Model(object):
         keyword_embeddings = tf.nn.embedding_lookup(params=self.embedding, ids=keyword_inputs)
 
         # probably MTA part
-        res1 = tf.sigmoid(tf.matmul(tf.reshape(keyword_embeddings, [self.batch_size, -1]), self.u_f))
-        phi_res = tf.reduce_sum(input_tensor=mask, axis=1, keepdims=True) * tf.cast(res1, tf.float32)
+        res1 = tf.Variable(tf.sigmoid(tf.matmul(tf.reshape(keyword_embeddings, [self.batch_size, -1]), self.u_f)))
+        phi_res = tf.Variable(tf.reduce_sum(input_tensor=mask, axis=1, keepdims=True) * tf.cast(res1, tf.float32))
             
         self.output1 = phi_res
             
@@ -184,7 +201,7 @@ class Model(object):
             attention_vs = tf.concat(vs, axis=1)
             prob_p = tf.nn.softmax(attention_vs)
             
-            self.gate = self.gate - (prob_p / phi_res)
+            self.gate = tf.Variable(self.gate - (prob_p / phi_res))
             
             atten_sum = prob_p * mask[:, time_step:time_step+1]
             mt = tf.add_n([prob_p[:, i:i+1]*keyword_embeddings[:, i, :] for i in range(config.num_keywords)])
@@ -199,20 +216,20 @@ class Model(object):
             
         self.output2 = atten_sum    
         output = tf.reshape(tf.concat(outputs, axis=1), [-1, self.size])
-        print("OUTPUT", output.shape)
-        print("SOFTMAX W", self.softmax_w.shape)
-        print("SOFTMAX B", self.softmax_b.shape)
+#         print("OUTPUT", output.shape)
+#         print("SOFTMAX W", self.softmax_w.shape)
+#         print("SOFTMAX B", self.softmax_b.shape)
         logits = tf.matmul(output, self.softmax_w) + self.softmax_b
         _ , logits_dim = logits.shape
         logits = tf.reshape(logits, [self.batch_size, -1, logits_dim])
-        print("LOGITS", logits.shape)
-        print("TARGETS", self._targets.shape)
-        print("MASK", self._mask.shape)
+#         print("LOGITS", logits.shape)
+#         print("TARGETS", self._targets.shape)
+#         print("MASK", self._mask.shape)
 
-        if not is_training:
-            prob = tf.nn.softmax(logits)
-            self._sample = tf.argmax(input=prob, axis=1)
-            return
+#         if not is_training:
+#             prob = tf.nn.softmax(logits)
+#             self._sample = tf.argmax(input=prob, axis=1)
+#             return
         return logits, phi_res, atten_sum
 
 
@@ -249,7 +266,7 @@ def main():
             }
         )
     train_dataset = tf.data.TFRecordDataset("coverage_data").map(decode_fn).shuffle(64).repeat(None)
-    model = Model(is_training=True, config=config)
+    model = LSTMModel(is_training=True, config=config)
     optimizer = tf.keras.optimizers.Adam(learning_rate=config.learning_rate)
 
     epochs = 2
@@ -258,7 +275,7 @@ def main():
 
         init_output = np.zeros((model.batch_size, model.size), dtype=np.float32)
         # Iterate over the batches of the dataset.
-        for step, batch_dict in enumerate(train_dataset):
+        for step, batch_dict in enumerate(tqdm(train_dataset)):
             input_data = batch_dict['input_data']
             target = batch_dict['target']
             mask = batch_dict['mask']
@@ -283,18 +300,20 @@ def main():
                 # to its inputs are going to be recorded
                 # on the GradientTape.
                 # logits = model(x_batch_train, training=True)  # Logits for this minibatch
-                logits, phi_res, atten_sum = model.forward(input_data, init_output, mask, key_words, is_training=False)
+                logits, phi_res, atten_sum = model.forward(input_data, init_output, mask, key_words, is_training=True)
 
                 # Compute the loss value for this minibatch.
                 loss_value = model.loss_calc(logits, target, mask, phi_res, atten_sum)
 
             # Use the gradient tape to automatically retrieve
             # the gradients of the trainable variables with respect to the loss.
-            grads = tape.gradient(loss_value, model.trainable_weights)
+#             for tw in model.trainable_weights():
+#                 print(type(tw))
+            grads = tape.gradient(loss_value, model.trainable_weights())
 
             # Run one step of gradient descent by updating
             # the value of the variables to minimize the loss.
-            optimizer.apply_gradients(zip(grads, model.trainable_weights))
+            optimizer.apply_gradients(zip(grads, model.trainable_weights()))
 
             # Log every 200 batches.
             if step % 200 == 0:
